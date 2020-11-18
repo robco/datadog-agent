@@ -195,8 +195,8 @@ func (p *ProcessResolver) insertEntry(pid uint32, entry *ProcessCacheEntry) *Pro
 		// starts, the in-kernel process cache will have out of sync container ID values for the processes of that
 		// container (the snapshot doesn't update the in-kernel cache with the container IDs). This can also happen if
 		// the proc_cache LRU ejects an entry.
-		// WARNING: this is why the user space cache should be used to detect container breakouts. Dedicated in-kernel
-		// probes will need to be added.
+		// WARNING: this is why the user space cache should not be used to detect container breakouts. Dedicated
+		// in-kernel probes will need to be added.
 		if len(parent.ID) > 0 && len(entry.ID) == 0 {
 			entry.ID = parent.ID
 		}
@@ -221,6 +221,7 @@ func (p *ProcessResolver) insertEntry(pid uint32, entry *ProcessCacheEntry) *Pro
 	return entry
 }
 
+// DeleteEntry tries to delete an entry in the process cache
 func (p *ProcessResolver) DeleteEntry(pid uint32, exitTime time.Time) {
 	p.Lock()
 	defer p.Unlock()
