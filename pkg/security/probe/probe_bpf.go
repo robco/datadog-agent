@@ -477,7 +477,7 @@ func (p *Probe) handleEvent(CPU int, data []byte, perfMap *manager.PerfMap, mana
 		// update the process resolver cache
 		event.updateProcessCachePointer(p.resolvers.ProcessResolver.AddEntry(event.Process.Pid, event.processCacheEntry))
 	case ExitEventType:
-		p.resolvers.ProcessResolver.DeleteEntry(event.Process.Pid, event.ResolveMonotonicTimestamp())
+		p.resolvers.ProcessResolver.DeleteEntry(event.Process.Pid, event.ResolveEventTimestamp())
 		// no need to dispatch
 		return
 	default:
