@@ -328,8 +328,11 @@ func (p *ProcessResolver) resolveWithProcfs(pid uint32) *ProcessCacheEntry {
 		return nil
 	}
 
-	entry, _ := p.syncCache(utils.GetFilledProcess(proc))
-	return entry
+	if filledProc := utils.GetFilledProcess(proc); filledProc != nil {
+		entry, _ := p.syncCache(filledProc)
+		return entry
+	}
+	return nil
 }
 
 func (p *ProcessResolver) Get(pid uint32) *ProcessCacheEntry {
