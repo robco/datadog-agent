@@ -12,6 +12,7 @@ import (
 
 	"github.com/DataDog/datadog-agent/pkg/aggregator"
 	"github.com/DataDog/datadog-agent/pkg/config"
+	"github.com/DataDog/datadog-agent/pkg/metrics"
 	"github.com/DataDog/datadog-agent/pkg/serializer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -85,7 +86,43 @@ func BenchmarkParsePackets(b *testing.B) {
 
 func BenchmarkParsePacketsMultiple(b *testing.B) {
 	// 64 packets of 10 samples
-	benchParsePackets(b, 64, 10)
+	benchParsePackets(b, buildPacketContent(2*32, 10))
+}
+
+var samplesBench []metrics.MetricSample
+
+func BenchmarkParseMetricMessage(b *testing.B) {
+	// our logger will log dogstatsd packet by default if nothing is setup
+	config.SetupLogger("", "off", "", "", false, true, false)
+
+	agg := mockAggregator()
+	s, _ := NewServer(agg)
+	defer s.Stop()
+
+	done := make(chan struct{})
+	go func() {
+		s, _, _ := agg.GetBufferedChannels()
+		for {
+			select {
+			case <-s:
+			case <-done:
+				return
+			}
+		}
+	}()
+	defer close(done)
+
+	parser := newParser(newFloat64ListPool())
+	originTagger := originTags{}
+	message := []byte("daemon:666|h|@0.5|#sometag1:somevalue1,sometag2:somevalue2")
+
+	b.RunParallel(func(pb *testing.PB) {
+		samplesBench := make([]metrics.MetricSample, 0, 512)
+		for pb.Next() {
+			s.parseMetricMessage(samplesBench, parser, message, originTagger.getTags)
+			samplesBench = samplesBench[0:0]
+		}
+	})
 }
 
 func BenchmarkWithMapper(b *testing.B) {
@@ -111,6 +148,7 @@ dogstatsd_mapper_profiles:
 
 	BenchmarkMapperControl(b)
 }
+
 func BenchmarkMapperControl(b *testing.B) {
 	port, err := getAvailableUDPPort()
 	require.NoError(b, err)

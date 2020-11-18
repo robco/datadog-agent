@@ -104,43 +104,41 @@ func isBlacklisted(metricName, namespace string, namespaceBlacklist []string) bo
 	return false
 }
 
-func enrichMetricSample(metricSample dogstatsdMetricSample, namespace string, namespaceBlacklist []string, defaultHostname string, originTagsFunc func() []string, entityIDPrecedenceEnabled bool) []metrics.MetricSample {
-	metricName := metricSample.name
-	tags, hostname := enrichTags(metricSample.tags, defaultHostname, originTagsFunc, entityIDPrecedenceEnabled)
+func enrichMetricSample(metricSamples []metrics.MetricSample, ddSample dogstatsdMetricSample, namespace string, namespaceBlacklist []string, defaultHostname string, originTagsFunc func() []string, entityIDPrecedenceEnabled bool) []metrics.MetricSample {
+	metricName := ddSample.name
+	tags, hostname := enrichTags(ddSample.tags, defaultHostname, originTagsFunc, entityIDPrecedenceEnabled)
 
 	if !isBlacklisted(metricName, namespace, namespaceBlacklist) {
 		metricName = namespace + metricName
 	}
 
-	mtype := enrichMetricType(metricSample.metricType)
+	mtype := enrichMetricType(ddSample.metricType)
 
-	// non set type
-	if len(metricSample.values) > 0 {
-		samples := []metrics.MetricSample{}
-		for idx := range metricSample.values {
-			samples = append(samples,
+	if len(ddSample.values) > 0 {
+		for idx := range ddSample.values {
+			metricSamples = append(metricSamples,
 				metrics.MetricSample{
 					Host:       hostname,
 					Name:       metricName,
 					Tags:       tags,
 					Mtype:      mtype,
-					Value:      metricSample.values[idx],
-					SampleRate: metricSample.sampleRate,
-					RawValue:   metricSample.setValue,
+					Value:      ddSample.values[idx],
+					SampleRate: ddSample.sampleRate,
+					RawValue:   ddSample.setValue,
 				})
 		}
-		return samples
+		return metricSamples
 	}
 
-	return []metrics.MetricSample{{
+	return append(metricSamples, metrics.MetricSample{
 		Host:       hostname,
 		Name:       metricName,
 		Tags:       tags,
 		Mtype:      mtype,
-		Value:      0,
-		SampleRate: metricSample.sampleRate,
-		RawValue:   metricSample.setValue,
-	}}
+		Value:      ddSample.value,
+		SampleRate: ddSample.sampleRate,
+		RawValue:   ddSample.setValue,
+	})
 }
 
 func enrichEventPriority(priority eventPriority) metrics.EventPriority {

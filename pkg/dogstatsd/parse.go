@@ -107,13 +107,12 @@ func (p *parser) parseMetricSample(message []byte) (dogstatsdMetricSample, error
 
 	var setValue []byte
 	var values []float64
+	var value float64
 	if metricType == setType {
 		setValue = rawValue
 	} else {
-		list := p.float64List.get()
-		values, err = parseFloat64List(rawValue, list)
+		values, value, err = p.parseFloat64List(rawValue)
 		if err != nil {
-			p.float64List.put(list)
 			return dogstatsdMetricSample{}, fmt.Errorf("could not parse dogstatsd metric values: %v", err)
 		}
 	}
@@ -135,6 +134,7 @@ func (p *parser) parseMetricSample(message []byte) (dogstatsdMetricSample, error
 
 	return dogstatsdMetricSample{
 		name:       p.interner.LoadOrStore(name),
+		value:      value,
 		values:     values,
 		setValue:   string(setValue),
 		metricType: metricType,
@@ -144,11 +144,19 @@ func (p *parser) parseMetricSample(message []byte) (dogstatsdMetricSample, error
 }
 
 // parse a list of float64 separated by colonSeparator
-func parseFloat64List(rawFloats []byte, values []float64) ([]float64, error) {
+func (p *parser) parseFloat64List(rawFloats []byte) ([]float64, float64, error) {
 	var value float64
 	var err error
 	idx := 0
 
+	idx = bytes.Index(rawFloats, colonSeparator)
+	// only one value
+	if idx == -1 {
+		value, err = parseFloat64(rawFloats)
+		return nil, value, err
+	}
+
+	values := p.float64List.get()
 	for idx != -1 && len(rawFloats) != 0 {
 		idx = bytes.Index(rawFloats, colonSeparator)
 		// skip empty value such as '21::22'
@@ -166,15 +174,17 @@ func parseFloat64List(rawFloats []byte, values []float64) ([]float64, error) {
 		}
 
 		if err != nil {
-			return nil, err
+			p.float64List.put(values)
+			return nil, 0, err
 		}
 
 		values = append(values, value)
 	}
 	if len(values) == 0 {
-		return nil, fmt.Errorf("no value found")
+		p.float64List.put(values)
+		return nil, 0, fmt.Errorf("no value found")
 	}
-	return values, nil
+	return values, 0, nil
 }
 
 // the std API does not have methods to do []byte => float parsing

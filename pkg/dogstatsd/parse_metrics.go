@@ -30,6 +30,7 @@ var (
 
 type dogstatsdMetricSample struct {
 	name       string
+	value      float64
 	values     []float64
 	setValue   string
 	metricType metricType

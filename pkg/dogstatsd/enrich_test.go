@@ -33,7 +33,8 @@ func parseAndEnrichSingleMetricMessage(message []byte, namespace string, namespa
 		return metrics.MetricSample{}, err
 	}
 
-	samples := enrichMetricSample(parsed, namespace, namespaceBlacklist, defaultHostname, returnEmptyTags, true)
+	samples := []metrics.MetricSample{}
+	samples = enrichMetricSample(samples, parsed, namespace, namespaceBlacklist, defaultHostname, returnEmptyTags, true)
 	if len(samples) != 1 {
 		return metrics.MetricSample{}, fmt.Errorf("wrong number of metrics parsed")
 	}
@@ -47,7 +48,8 @@ func parseAndEnrichMultipleMetricMessage(message []byte, namespace string, names
 		return []metrics.MetricSample{}, err
 	}
 
-	return enrichMetricSample(parsed, namespace, namespaceBlacklist, defaultHostname, returnEmptyTags, true), nil
+	samples := []metrics.MetricSample{}
+	return enrichMetricSample(samples, parsed, namespace, namespaceBlacklist, defaultHostname, returnEmptyTags, true), nil
 }
 
 func parseAndEnrichServiceCheckMessage(message []byte, defaultHostname string) (*metrics.ServiceCheck, error) {

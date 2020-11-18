@@ -353,6 +353,9 @@ func nextMessage(packet *[]byte) (message []byte) {
 }
 
 func (s *Server) parsePackets(batcher *batcher, parser *parser, packets []*listeners.Packet) {
+	// we allocate it once for the life of the server instead of once per
+	// packet
+	samples := make([]metrics.MetricSample, 0, 512)
 	for _, packet := range packets {
 		originTagger := originTags{origin: packet.Origin}
 		log.Tracef("Dogstatsd receive: %q", packet.Contents)
@@ -395,7 +398,8 @@ func (s *Server) parsePackets(batcher *batcher, parser *parser, packets []*liste
 				}
 				batcher.appendEvent(event)
 			case metricSampleType:
-				samples, err := s.parseMetricMessage(parser, message, originTagger.getTags)
+				var err error
+				samples, err = s.parseMetricMessage(samples, parser, message, originTagger.getTags)
 				if err != nil {
 					originTags := originTagger.getTags()
 					if len(originTags) > 0 {
@@ -403,6 +407,7 @@ func (s *Server) parsePackets(batcher *batcher, parser *parser, packets []*liste
 					} else {
 						s.errLog("Dogstatsd: error parsing metric message '%q': %s", message, err)
 					}
+					samples = samples[0:0]
 					continue
 				}
 				for idx := range samples {
@@ -417,6 +422,7 @@ func (s *Server) parsePackets(batcher *batcher, parser *parser, packets []*liste
 						batcher.appendSample(*distSample)
 					}
 				}
+				samples = samples[0:0]
 			}
 		}
 		s.sharedPacketPool.Put(packet)
@@ -432,12 +438,12 @@ func (s *Server) errLog(format string, params ...interface{}) {
 	}
 }
 
-func (s *Server) parseMetricMessage(parser *parser, message []byte, originTagsFunc func() []string) ([]metrics.MetricSample, error) {
+func (s *Server) parseMetricMessage(metricSamples []metrics.MetricSample, parser *parser, message []byte, originTagsFunc func() []string) ([]metrics.MetricSample, error) {
 	sample, err := parser.parseMetricSample(message)
 	if err != nil {
 		dogstatsdMetricParseErrors.Add(1)
 		tlmProcessed.IncWithTags(tlmProcessedErrorTags)
-		return nil, err
+		return metricSamples, err
 	}
 	if s.mapper != nil {
 		mapResult := s.mapper.Map(sample.name)
@@ -447,7 +453,8 @@ func (s *Server) parseMetricMessage(parser *parser, message []byte, originTagsFu
 			sample.tags = append(sample.tags, mapResult.Tags...)
 		}
 	}
-	metricSamples := enrichMetricSample(sample, s.metricPrefix, s.metricPrefixBlacklist, s.defaultHostname, originTagsFunc, s.entityIDPrecedenceEnabled)
+	metricSamples = enrichMetricSample(metricSamples, sample, s.metricPrefix, s.metricPrefixBlacklist, s.defaultHostname, originTagsFunc, s.entityIDPrecedenceEnabled)
+
 	if len(sample.values) > 0 {
 		s.sharedFloat64List.put(sample.values)
 	}
