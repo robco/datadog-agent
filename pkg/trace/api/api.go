@@ -100,12 +100,12 @@ func (r *HTTPReceiver) Start() {
 		killProcess("Error creating tcp listener: %v", err)
 	}
 
-	mux := cmux.New(ln)
+	tcpm := cmux.New(ln)
 
 	// We first match on HTTP 1.1 methods.
-	httpl := mux.Match(cmux.HTTP1Fast())
+	httpl := tcpm.Match(cmux.HTTP1Fast())
 	// Else, we assume TLS
-	tlsl := mux.Match(cmux.Any())
+	tlsl := tcpm.Match(cmux.Any())
 
 	go func() {
 		defer watchdog.LogOnPanic()
@@ -113,7 +113,7 @@ func (r *HTTPReceiver) Start() {
 	}()
 	go func() {
 		// do we need a watchdog?
-		r.tlsServer.Serve(tlsl)
+		r.ServeGRPC(tlsl)
 	}()
 	log.Infof("Listening for traces at http://%s", addr)
 
@@ -135,6 +135,13 @@ func (r *HTTPReceiver) Start() {
 	go func() {
 		defer watchdog.LogOnPanic()
 		r.loop()
+	}()
+
+	// start cmux serving
+	go func() {
+		if err := tcpm.Serve(); !strings.Contains(err.Error(), "use of closed network connection") {
+			panic(err)
+		}
 	}()
 }
 
@@ -200,7 +207,6 @@ func (r *HTTPReceiver) ServeHTTP(l net.Listener) {
 
 	r.attachDebugHandlers(mux)
 	r.attachHandlers(mux)
-	mux.Handle("/profiling/v1/input", r.profileProxyHandler())
 
 	timeout := 5 * time.Second
 	if r.conf.ReceiverTimeout > 0 {
