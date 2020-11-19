@@ -21,7 +21,7 @@ func buildRawSample(tagCount int, multipleValues bool) []byte {
 
 // used to store the result and avoid optimizations
 var (
-	benchSamples = make([]metrics.MetricSample, 0, 512)
+	benchSamples []metrics.MetricSample
 )
 
 func runParseMetricBenchmark(b *testing.B, multipleValues bool) {
@@ -32,6 +32,7 @@ func runParseMetricBenchmark(b *testing.B, multipleValues bool) {
 		b.Run(fmt.Sprintf("%d-tags", i), func(sb *testing.B) {
 			rawSample := buildRawSample(i, multipleValues)
 			sb.ResetTimer()
+			samples := make([]metrics.MetricSample, 0, 2)
 
 			for n := 0; n < sb.N; n++ {
 
@@ -40,7 +41,7 @@ func runParseMetricBenchmark(b *testing.B, multipleValues bool) {
 					continue
 				}
 
-				benchSamples = enrichMetricSample(benchSamples, parsed, "", namespaceBlacklist, "default-hostname", returnEmptyTags, true)
+				benchSamples = enrichMetricSample(samples, parsed, "", namespaceBlacklist, "default-hostname", returnEmptyTags, true)
 			}
 		})
 	}
