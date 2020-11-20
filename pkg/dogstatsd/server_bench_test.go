@@ -72,9 +72,10 @@ func benchParsePackets(b *testing.B, rawPacket []byte) {
 		}
 
 		packets := listeners.Packets{&packet}
+		samples := make([]metrics.MetricSample, 0, 512)
 		for pb.Next() {
 			packet.Contents = rawPacket
-			s.parsePackets(batcher, parser, packets)
+			samples = s.parsePackets(batcher, parser, packets, samples)
 		}
 	})
 }
@@ -177,13 +178,14 @@ func BenchmarkMapperControl(b *testing.B) {
 	batcher := newBatcher(agg)
 	parser := newParser(newFloat64ListPool())
 
+	samples := make([]metrics.MetricSample, 0, 512)
 	for n := 0; n < b.N; n++ {
 		packet := listeners.Packet{
 			Contents: []byte("airflow.job.duration.my_job_type.my_job_name:666|g"),
 			Origin:   listeners.NoOrigin,
 		}
 		packets := listeners.Packets{&packet}
-		s.parsePackets(batcher, parser, packets)
+		samples = s.parsePackets(batcher, parser, packets, samples)
 	}
 
 	b.ReportAllocs()

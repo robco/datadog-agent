@@ -327,13 +327,20 @@ func (s *Server) worker() {
 	batcher := newBatcher(s.aggregator)
 
 	parser := newParser(s.sharedFloat64List)
+	// we allocate it once for the life of the worker instead of once per
+	// packet. This will be use to store the samples out a of packets.
+	// Allocating it every time is very costly, especially on the GC.
+	samples := make([]metrics.MetricSample, 0, 512)
 	for {
 		select {
 		case <-s.stopChan:
 			return
 		case <-s.health.C:
 		case packets := <-s.packetsIn:
-			s.parsePackets(batcher, parser, packets)
+			samples = samples[0:0]
+			// we return the samples in case the slice was extended
+			// when parsing the packets
+			samples = s.parsePackets(batcher, parser, packets, samples)
 		}
 	}
 }
@@ -352,10 +359,7 @@ func nextMessage(packet *[]byte) (message []byte) {
 	return message
 }
 
-func (s *Server) parsePackets(batcher *batcher, parser *parser, packets []*listeners.Packet) {
-	// we allocate it once for the life of the server instead of once per
-	// packet
-	samples := make([]metrics.MetricSample, 0, 512)
+func (s *Server) parsePackets(batcher *batcher, parser *parser, packets []*listeners.Packet, samples []metrics.MetricSample) []metrics.MetricSample {
 	for _, packet := range packets {
 		originTagger := originTags{origin: packet.Origin}
 		log.Tracef("Dogstatsd receive: %q", packet.Contents)
@@ -399,6 +403,8 @@ func (s *Server) parsePackets(batcher *batcher, parser *parser, packets []*liste
 				batcher.appendEvent(event)
 			case metricSampleType:
 				var err error
+				samples = samples[0:0]
+
 				samples, err = s.parseMetricMessage(samples, parser, message, originTagger.getTags)
 				if err != nil {
 					originTags := originTagger.getTags()
@@ -407,7 +413,6 @@ func (s *Server) parsePackets(batcher *batcher, parser *parser, packets []*liste
 					} else {
 						s.errLog("Dogstatsd: error parsing metric message '%q': %s", message, err)
 					}
-					samples = samples[0:0]
 					continue
 				}
 				for idx := range samples {
@@ -422,12 +427,12 @@ func (s *Server) parsePackets(batcher *batcher, parser *parser, packets []*liste
 						batcher.appendSample(*distSample)
 					}
 				}
-				samples = samples[0:0]
 			}
 		}
 		s.sharedPacketPool.Put(packet)
 	}
 	batcher.flush()
+	return samples
 }
 
 func (s *Server) errLog(format string, params ...interface{}) {
