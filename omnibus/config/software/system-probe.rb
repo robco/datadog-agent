@@ -26,11 +26,11 @@ build do
   end
 
   copy 'pkg/ebpf/c/COPYING', "#{install_dir}/embedded/share/system-probe/ebpf/"
-  copy 'pkg/ebpf/bytecode/build/bpf-common.h', "#{install_dir}/embedded/share/system-probe/ebpf/"
+  copy 'pkg/collector/corechecks/ebpf/c/bcc/bpf-common.h', "#{install_dir}/embedded/share/system-probe/ebpf/"
 
-  copy 'pkg/ebpf/bytecode/build/oom-kill-kern.c', "#{install_dir}/embedded/share/system-probe/ebpf/"
-  copy 'pkg/ebpf/bytecode/build/oom-kill-kern-user.h', "#{install_dir}/embedded/share/system-probe/ebpf/"
+  copy 'pkg/collector/corechecks/ebpf/c/bcc/oom-kill-kern.c', "#{install_dir}/embedded/share/system-probe/ebpf/"
+  copy 'pkg/collector/corechecks/ebpf/c/oom-kill-kern-user.h', "#{install_dir}/embedded/share/system-probe/ebpf/"
 
-  copy 'pkg/ebpf/bytecode/build/tcp-queue-length-kern.c', "#{install_dir}/embedded/share/system-probe/ebpf/"
-  copy 'pkg/ebpf/bytecode/build/tcp-queue-length-kern-user.h', "#{install_dir}/embedded/share/system-probe/ebpf/"
+  copy 'pkg/collector/corechecks/ebpf/c/bcc/tcp-queue-length-kern.c', "#{install_dir}/embedded/share/system-probe/ebpf/"
+  copy 'pkg/collector/corechecks/ebpf/c/tcp-queue-length-kern-user.h', "#{install_dir}/embedded/share/system-probe/ebpf/"
 end
